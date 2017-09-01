@@ -3,6 +3,7 @@
 #include "json.hpp"
 #include "PID.h"
 #include <math.h>
+#include <getopt.h>
 
 // for convenience
 using json = nlohmann::json;
@@ -27,15 +28,93 @@ std::string hasData(std::string s) {
   }
   return "";
 }
+void ResetSimulator(uWS::WebSocket<uWS::SERVER> ws) {
 
-int main()
+  std::string msg = "42[\"reset\",{}]";
+  ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+
+}
+
+int main(int argc, char* argv[])
 {
   uWS::Hub h;
 
-  PID pid;
+  PID pid_steer;
+  PID pid_thrott;
   // TODO: Initialize the pid variable.
+  std::vector<double> steer;
+  double kp_steer = 0;
+  double kd_steer = 0;
+  double ki_steer = 0;
+  bool auto_tune = false;
+  bool started = false;
+  int frame_start= 0;
+  int frame_end = 1000;
+  //double kp_thrott = std::atof(argv[4]);
+  //double kd_thrott = std::atof(argv[5]);
+  //double ki_thrott = std::atof(argv[6]);
+  int i=0;
+  int option;
+  while((option = getopt(argc, argv, "as:f:")) !=-1) {
+      switch (option) {
+          case 'a': {
+            auto_tune = true;
+            std::cout<<"External auto tune"<<std::endl;
+            break;
+        }
+          case 's': {
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+
+            char delimiter = ',';
+            std::string acc = "";
+            std::string input = optarg;
+            int ind = 0;
+            for(unsigned int i = 0; i < input.size(); i++)
+            {
+                if(input[i] == delimiter)
+                {
+                    if(ind==0) {kp_steer = std::atof(acc.c_str());}
+                    if(ind==1) {ki_steer = std::atof(acc.c_str());}
+                    if(ind==2) {kd_steer = std::atof(acc.c_str());}
+                    ind ++;
+                    acc = "";
+                }
+                else
+                    acc += input[i];
+            }
+            break;
+        }
+           case 'f':
+           {
+
+
+               char delimiter = ',';
+               std::string acc = "";
+               std::string input = optarg;
+               int ind = 0;
+               for(unsigned int i = 0; i < input.size(); i++)
+               {
+                   if(input[i] == delimiter)
+                   {
+                       if(ind==0) {frame_start = std::atof(acc.c_str());}
+                       if(ind==1) {frame_end = std::atof(acc.c_str());}
+                       ind ++;
+                       acc = "";
+                   }
+                   else
+                       acc += input[i];
+               }
+               break;
+           }
+
+      }
+  }
+  std::cout<<"kp: "<<kp_steer<<" ki: "<< ki_steer<<" kd: "<< kd_steer<<std::endl;
+    std::cout<<"start: "<<frame_start<<" end: "<< frame_end<<std::endl;
+  pid_steer.Init(kp_steer, ki_steer, kd_steer);
+  //pid_thrott.Init(kp_thrott, kd_thrott, ki_thrott);
+
+  h.onMessage([&auto_tune, &i, &pid_steer, &pid_thrott, &frame_start, &frame_end, &started](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -57,15 +136,39 @@ int main()
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
-          
+          pid_steer.UpdateError(cte);
+          steer_value = - pid_steer.TotalError() / deg2rad(25.0);
+          steer_value = std::min(1.0, std::max(-1.0, steer_value));
+          //std::cout<< i<<std::endl;
+          i++;
+          if (auto_tune){
+              if ((i==frame_start)&&(!started)){
+                  pid_steer.Reset();
+                  std::cout << "started" << std::endl;
+                  started = true;
+                  i=0;
+              }
+              if (( i>frame_end) || ((fabs(cte) > 4.5)&&(started))){
+                  double Kp, Kd, Ki;
+                  std::cout << "$input@" << std::endl;
+                  std::cout << "$" <<pid_steer.GetAvgError(i)<<"@"<<std::endl;
+                  std::cin >> Kp >> Kd >> Ki;
+                  pid_steer.SetParams(Kp, Kd, Ki);
+                  pid_steer.Reset();
+                  ResetSimulator(ws);
+                  i = 0;
+                  started = false;
+              }
+        }
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+
+          //std::cout << "CTE: " << cte << " Steering Value: " << steer_value <<" Angle: "<<angle<< std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = 0.3;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
