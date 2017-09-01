@@ -27,11 +27,15 @@ and the algorithm finally converges in kp=0.240130172319 ki=0 kd=5.3309999
 
 To run the program with the found pid parameters
 
-cd build
-./pid -s 0.240130172319,0,5.3309999,
+* cd build
+* cmake .. && make
+* ./pid -s 0.240130172319,0,5.3309999,
 
 to run the program with the twiddle algorithm
-python coeff_finder.py
+* cd build
+* cmake .. && make
+* cd ..
+* python coeff_finder.py
 
 
 ## Dependencies
