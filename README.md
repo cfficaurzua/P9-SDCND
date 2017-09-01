@@ -2,6 +2,37 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+The goal of this project is develop a PID controller to drive a car through the track of the udacity simulator, with minimum oscillation and without getting off-track
+
+To achieve the goal first I develop the pid controller in C++, using the cross track error [cte] (difference between the center of the car and the current position of the vehicle), and multiplying it with a constant Kp, then the derivative of the cte is multiplyied with a constant Kd and the same for the accumulative sum of cte which is multiplied by ki
+
+therefore the output of the actuator in this case the steering wheel is obtained from the formula
+actuator = -(kp*cte + ki*sum(cte) + kd*d(cte))
+
+to obtain the actual parameters, a tunning algorithm is necessary
+
+to tune the algorithm I used the Twiddle algorithm suggested in the classroom, the Twiddle logic was written in python and communicated with binary executable written in c++ through the commandline pipeline.
+
+The twiddle algorithm just changes up and down each parameter with a small detla and evaluates the result and then changes the next parameter and so on.
+
+to evaluate the result, the algorithm let the car drive with the current parameters and retrieve the accumulative error for a period of n frames, if the car gets off the track, the simulator and the acummulative error reset automatically. 
+the acummulative error is algo multiplied by an exponential decay in order to penalized parameters that couldn't keep on track for enough time. so the longer the car drives lesser is the error.
+
+at first the algorithm converges in a local minima that couldn't satisfied the needs of driving within the lane and achieve at least one track.
+
+then I tried manually tweaking the parameters, until i can achieve one lap. and then using those parameters to get a near local minima
+
+I started with kp=0.25 ki=0 kd=5
+and the algorithm finally converges in kp=0.240130172319 ki=0 kd=5.3309999
+
+To run the program with the found pid parameters
+
+cd build
+./pid -s 0.240130172319,0,5.3309999,
+
+to run the program with the twiddle algorithm
+python coeff_finder.py
+
 
 ## Dependencies
 
