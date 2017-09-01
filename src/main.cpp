@@ -46,15 +46,22 @@ int main(int argc, char* argv[])
   double kp_steer = 0;
   double kd_steer = 0;
   double ki_steer = 0;
+
+  // Twiddle algorithm run in python enable
   bool auto_tune = false;
   bool started = false;
+
+  // starting and ending point of optimization
   int frame_start= 0;
   int frame_end = 1000;
-  //double kp_thrott = std::atof(argv[4]);
-  //double kd_thrott = std::atof(argv[5]);
-  //double ki_thrott = std::atof(argv[6]);
   int i=0;
   int option;
+
+  // get parameters from commandline
+  // a => auto_tune with twiddle from python
+  // s => steering pid parameters kp, ki, kd, => example: -s 5,6,7,
+  // f => starting and ending point from auto_tunning => example -f 500,1000
+
   while((option = getopt(argc, argv, "as:f:")) !=-1) {
       switch (option) {
           case 'a': {
@@ -141,18 +148,24 @@ int main(int argc, char* argv[])
           steer_value = std::min(1.0, std::max(-1.0, steer_value));
           //std::cout<< i<<std::endl;
           i++;
+
+          //communication with python if auto_tune enabled
           if (auto_tune){
               if ((i==frame_start)&&(!started)){
+                  //reset error and frame
                   pid_steer.Reset();
                   std::cout << "started" << std::endl;
                   started = true;
                   i=0;
               }
               if (( i>frame_end) || ((fabs(cte) > 4.5)&&(started))){
+                  // expects parameters to try
                   double Kp, Kd, Ki;
                   std::cout << "$input@" << std::endl;
+                  // broadcast the last error from the previous parameters
                   std::cout << "$" <<pid_steer.GetAvgError(i)<<"@"<<std::endl;
                   std::cin >> Kp >> Kd >> Ki;
+                  //resets everything
                   pid_steer.SetParams(Kp, Kd, Ki);
                   pid_steer.Reset();
                   ResetSimulator(ws);
